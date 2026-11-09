@@ -56,8 +56,9 @@ jobs:
           # 5. Création de la branche orpheline
           git checkout --orphan gh-pages-temp
 
-          # 6. Ajout du fichier HTML généré
+          # 6. Ajout des pages HTML générées (index.html + defilant.html si présent)
           git add -f index.html
+          if (Test-Path defilant.html) { git add -f defilant.html }
 
           # 7. Commit et Push forcé
           git commit -m "🤖 Mise à jour automatique de l'emploi du temps"

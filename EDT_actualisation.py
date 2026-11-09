@@ -1,4 +1,5 @@
 import sys
+import json
 import time
 import datetime
 import zoneinfo
@@ -551,6 +552,64 @@ def generer_page_html(donnees_promos):
 
 
 # ==============================================================================
+# GÉNÉRATION DE LA 2e PAGE (template défilant : defilant.html)
+# ==============================================================================
+
+TEMPLATE_DEFILANT = "template_defilant.html"
+SORTIE_DEFILANT = "defilant.html"
+
+# Habillage de chaque formation (type, nom affiché, couleur, couleur du texte)
+FORMATIONS_STYLE = {
+    "LP MIA":     ("Licence pro", "MIA",    "#009fe3", "#1d1d1b"),
+    "BUT 3 SNRV": ("BUT",         "SNRV",   "#e30613", "#ffffff"),
+    "M1 MPAD":    ("Master 1",    "MPAD",   "#3aaa35", "#1d1d1b"),
+    "M2 MPAD":    ("Master 2",    "MPAD",   "#3aaa35", "#1d1d1b"),
+}
+CLES_JOURS = ["lun", "mar", "mer", "jeu", "ven"]
+
+
+def lundi_affiche():
+    """Même règle que la page : le week-end, on affiche la semaine suivante."""
+    auj = datetime.datetime.now(TIMEZONE_FRANCE).date()
+    lundi = auj - datetime.timedelta(days=auj.weekday())
+    if auj.weekday() >= 5:
+        lundi += datetime.timedelta(days=7)
+    return lundi
+
+
+def generer_page_defilante(donnees_promos):
+    """Injecte les cours de chaque promo dans template_defilant.html."""
+    lundi = lundi_affiche()
+    dimanche = lundi + datetime.timedelta(days=6)
+
+    formations = []
+    for promo, donnees in donnees_promos.items():
+        type_, nom, couleur, texte = FORMATIONS_STYLE.get(promo, ("", promo, "#009fe3", "#1d1d1b"))
+        cours = []
+        for c in donnees['tous_cours']:
+            d = c['debut'].date()
+            if not (lundi <= d <= dimanche) or d.weekday() > 4:
+                continue
+            cours.append({
+                "jour": CLES_JOURS[d.weekday()],
+                "debut": c['debut'].strftime("%H:%M"),
+                "fin": c['fin'].strftime("%H:%M"),
+                "matiere": c['titre'],
+                "prof": c['enseignant'],
+                "salle": c['salle'] if c['salle'] != "Inconnue" else "",
+                "groupe": c['groupe'],
+            })
+        formations.append({"type": type_, "nom": nom, "couleur": couleur,
+                           "texte": texte, "cours": cours})
+
+    with open(TEMPLATE_DEFILANT, encoding="utf-8") as f:
+        html = f.read()
+    # "</" échappé pour ne pas fermer la balise <script> par accident
+    payload = json.dumps(formations, ensure_ascii=False, indent=1).replace("</", "<\\/")
+    return html.replace("__LUNDI__", lundi.isoformat()).replace("__FORMATIONS__", payload)
+
+
+# ==============================================================================
 # SCRIPT PRINCIPAL
 # ==============================================================================
 
@@ -572,7 +631,8 @@ def main():
         semaine, aujourdhui = filtrer_semaine_et_jour(evenements, promo)
         donnees_promos[promo] = {
             'semaine': semaine,
-            'aujourdhui': aujourdhui
+            'aujourdhui': aujourdhui,
+            'tous_cours': [extraire_details(ev, promo) for ev in evenements]
         }
 
     if succes_global and len(donnees_promos) == len(URLS_PROMOTIONS):
@@ -584,6 +644,14 @@ def main():
             f.write(html_output)
 
         print(f"[SUCCÈS] Fichier '{nom_fichier}' généré et mis à jour avec succès !")
+
+        # 2e page : affichage défilant (échec isolé : ne bloque pas index.html)
+        try:
+            with open(SORTIE_DEFILANT, "w", encoding="utf-8") as f:
+                f.write(generer_page_defilante(donnees_promos))
+            print(f"[SUCCÈS] Fichier '{SORTIE_DEFILANT}' généré avec succès !")
+        except Exception as e:
+            print(f"[ERREUR] Page défilante non générée : {e}", file=sys.stderr)
     else:
         print("[ERREUR / SÉCURITÉ] Un ou plusieurs flux n'ont pas pu être récupérés. Mise à jour de index.html annulée pour conserver l'ancienne version.", file=sys.stderr)
         sys.exit(0)  # Sortie propre sans écraser le fichier existant
