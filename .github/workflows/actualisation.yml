@@ -11,27 +11,26 @@ permissions:
 jobs:
   build-and-commit:
     runs-on: self-hosted
+    env:
+      PYTHON_BIN: 'C:\Users\mohamed.didi\AppData\Local\Programs\Python\Python312\python.exe'
     steps:
       - name: Récupérer le code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Configuration de Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Installer les dépendances
+        shell: powershell
         run: |
-          python -m pip install --upgrade pip
-          pip install requests icalendar urllib3 tzdata
+          & "${{ env.PYTHON_BIN }}" -m pip install --upgrade pip
+          & "${{ env.PYTHON_BIN }}" -m pip install requests icalendar urllib3 tzdata
 
       - name: Exécuter le script
         env:
           PYTHONIOENCODING: "utf-8"
+        shell: powershell
         run: |
-          python EDT_actualisation.py
+          & "${{ env.PYTHON_BIN }}" EDT_actualisation.py
 
       - name: Déployer sur gh-pages (PowerShell)
         shell: powershell
