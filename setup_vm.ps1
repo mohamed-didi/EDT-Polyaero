@@ -21,12 +21,21 @@ if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdenti
 }
 
 # --- 1. Python ---------------------------------------------------------------
-$python = (& where.exe python 2>$null | Where-Object { $_ -notmatch "WindowsApps" } | Select-Object -First 1)
+function Trouver-Python {
+    $c = Get-Command python -ErrorAction SilentlyContinue | Where-Object { $_.Source -notmatch "WindowsApps" } | Select-Object -First 1
+    if ($c) { return $c.Source }
+    return $null
+}
+$python = Trouver-Python
 if (-not $python) {
-    Write-Host "Python introuvable : installation via winget..."
-    winget install -e --id Python.Python.3.12 --accept-package-agreements --accept-source-agreements
-    $python = (& where.exe python 2>$null | Where-Object { $_ -notmatch "WindowsApps" } | Select-Object -First 1)
-    if (-not $python) { throw "Python vient d'être installé : fermez ce PowerShell, rouvrez-le (admin) et relancez le script." }
+    Write-Host "Python introuvable : téléchargement et installation (python.org)..."
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $installeur = Join-Path $env:TEMP "python-install.exe"
+    Invoke-WebRequest -UseBasicParsing -Uri "https://www.python.org/ftp/python/3.12.8/python-3.12.8-amd64.exe" -OutFile $installeur
+    Start-Process $installeur -ArgumentList "/quiet InstallAllUsers=1 PrependPath=1 Include_launcher=0" -Wait
+    $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+    $python = Trouver-Python
+    if (-not $python) { throw "Python n'a pas pu être installé automatiquement. Installez-le à la main depuis python.org (cocher 'Add to PATH') puis relancez ce script." }
 }
 Write-Host "Python : $python"
 & $python -m pip install --quiet --upgrade requests icalendar tzdata
