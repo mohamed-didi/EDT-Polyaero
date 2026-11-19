@@ -84,7 +84,7 @@ body{font-family:var(--font-sans);color:var(--noir);font-weight:300;cursor:none}
 /* Diagnostic (ES5, compatible vieux navigateurs de TV) : affiche les erreurs à l'écran. ?debug=1 affiche aussi le navigateur. */
 window.dbg = function(m){ var d = document.getElementById("dbg"); d.style.display = "block"; d.appendChild(document.createTextNode(m + "\n")); };
 window.onerror = function(m, u, l){ window.dbg("ERREUR: " + m + " (" + String(u || "").split("/").pop() + ":" + l + ")"); };
-if (/[?&]debug=1/.test(location.search)) window.dbg("UA: " + navigator.userAgent + " | Ecran " + screen.width + "x" + screen.height + " dpr " + window.devicePixelRatio);
+if (/[?&]debug=1/.test(location.search)) window.dbg("UA: " + navigator.userAgent + " | Ecran " + screen.width + "x" + screen.height + " | Fenetre " + innerWidth + "x" + innerHeight + " | dpr " + window.devicePixelRatio + " | grid " + (window.CSS && CSS.supports ? CSS.supports("display","grid") : "?") + " | vars " + (window.CSS && CSS.supports ? CSS.supports("--a","0") : "?"));
 </script>
 <div id="scene">
   <header class="haut">
