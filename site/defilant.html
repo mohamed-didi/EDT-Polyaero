@@ -79,6 +79,13 @@ body{font-family:var(--font-sans);color:var(--noir);font-weight:300;cursor:none}
 </style>
 </head>
 <body>
+<div id="dbg" style="position:fixed;left:0;top:0;right:0;z-index:9999;background:#000;color:#0f0;font:22px monospace;padding:8px;display:none;white-space:pre-wrap"></div>
+<script>
+/* Diagnostic (ES5, compatible vieux navigateurs de TV) : affiche les erreurs à l'écran. ?debug=1 affiche aussi le navigateur. */
+window.dbg = function(m){ var d = document.getElementById("dbg"); d.style.display = "block"; d.appendChild(document.createTextNode(m + "\n")); };
+window.onerror = function(m, u, l){ window.dbg("ERREUR: " + m + " (" + String(u || "").split("/").pop() + ":" + l + ")"); };
+if (/[?&]debug=1/.test(location.search)) window.dbg("UA: " + navigator.userAgent + " | Ecran " + screen.width + "x" + screen.height + " dpr " + window.devicePixelRatio);
+</script>
 <div id="scene">
   <header class="haut">
     <div class="haut__prog"><div class="haut__type" id="pType"></div><div class="haut__nom" id="pNom"></div></div>
@@ -89,7 +96,7 @@ body{font-family:var(--font-sans);color:var(--noir);font-weight:300;cursor:none}
   <div class="progression"><div id="barre"></div></div>
 </div>
 
-<script src="data.js"></script>
+<script src="data.js" onerror="window.dbg('data.js non charge')"></script>
 <script>
 /* =====================================================================
    PARAMÈTRES — à modifier
@@ -134,6 +141,7 @@ function pale(hex, t=.16){ // couleur pleine éclaircie (pas de transparence)
   const m = c => Math.round(255 - (255-c)*t);
   return `rgb(${m(r)},${m(g)},${m(b)})`;
 }
+const p2 = x => (x < 10 ? "0" : "") + x;
 const minutes = s => { const [h,m] = s.split(":").map(Number); return h*60+(m||0); };
 
 function lundiCourant(){
@@ -212,7 +220,7 @@ function construire(f){
       const v = document.createElement("div"); v.className="vide"; v.textContent = "Pas de cours"; corps.appendChild(v);
     }
     if (estAuj){ const tj = document.createElement("div"); tj.id = "maintenant-j"; corps.appendChild(tj); }
-    col.append(en, corps);
+    col.appendChild(en); col.appendChild(corps);
     grille.appendChild(col);
   });
   const nl = document.createElement("div"); nl.id = "maintenant"; nl.appendChild(document.createElement("span"));
@@ -231,7 +239,7 @@ function placerMaintenant(){
   const y = (m-debut)/(fin-debut)*h;
   nl.style.top = (60 + y) + "px";
   if (tj){ tj.style.display = "block"; tj.style.top = y + "px"; }
-  nl.firstChild.textContent = `${n.getHours()}h${String(n.getMinutes()).padStart(2,"0")}`;
+  nl.firstChild.textContent = `${n.getHours()}h${p2(n.getMinutes())}`;
 }
 setInterval(placerMaintenant, 30000);
 
@@ -277,12 +285,16 @@ setTimeout(() => location.reload(), 10*60*1000);
 
 /* ---- Construction des formations depuis data.js (heures lues en heure de Paris) ---- */
 function construireFormations(){
-  const data = window.EDT_DATA; if (!data) return [];
-  const fmt = new Intl.DateTimeFormat("fr-CA", {timeZone:"Europe/Paris", year:"numeric", month:"2-digit", day:"2-digit",
-                                               hour:"2-digit", minute:"2-digit", hourCycle:"h23"});
-  const parts = ms => { const o = {}; fmt.formatToParts(new Date(ms)).forEach(p => o[p.type] = p.value);
-                        return {jour:`${o.year}-${o.month}-${o.day}`, heure:`${o.hour}:${o.minute}`}; };
-  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const data = window.EDT_DATA; if (!data){ window.dbg("data.js vide ou absent"); return []; }
+  // Heure de Paris calculée à la main (sans Intl, pour les vieux navigateurs) : UTC+1 en hiver, UTC+2 en été
+  const dernierDimanche = (an, mois) => { const d = new Date(Date.UTC(an, mois, 31, 1)); d.setUTCDate(31 - d.getUTCDay()); return d.getTime(); };
+  const parts = ms => {
+    const an = new Date(ms).getUTCFullYear();
+    const ete = ms >= dernierDimanche(an, 2) && ms < dernierDimanche(an, 9);
+    const t = new Date(ms + (ete ? 2 : 1) * 3600000);
+    return { jour: `${t.getUTCFullYear()}-${p2(t.getUTCMonth()+1)}-${p2(t.getUTCDate())}`, heure: `${p2(t.getUTCHours())}:${p2(t.getUTCMinutes())}` };
+  };
+  const iso = d => `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
   const parJour = {}; JOURS.forEach(([k],n) => { const d = new Date(lundi); d.setDate(d.getDate()+n); parJour[iso(d)] = k; });
 
   const res = [];
